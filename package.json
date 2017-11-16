@@ -7,7 +7,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Ezekiel Warren",
+  "repository": "github:zaucy/grpc-gen",
+  "bugs": {
+    "url": "https://github.com/zaucy/grpc-gen/issues"
+  },
   "license": "ISC",
   "dependencies": {
     "@types/google-protobuf": "^3.2.7",
