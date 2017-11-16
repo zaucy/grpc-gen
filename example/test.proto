@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+message TestMessage {
+	string test_property = 1;
+}
+
+service TestService {
+	rpc test(TestMessage) returns(TestMessage) {}
+}

@@ -1,0 +1,7 @@
+{
+	"files": [
+		"test.proto"
+	],
+	"node_out": "server",
+	"web_out": "browser"
+}

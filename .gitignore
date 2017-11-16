@@ -1,0 +1,5 @@
+# Generated files from example
+/example/browser
+/example/client
+
+/node_modules
