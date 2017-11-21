@@ -1,6 +1,6 @@
 {
   "name": "grpc-gen",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "bin": "src/cli.js",
   "description": "Simple CLI for generating stubs for gRPC Node. and grpc-web-client",
   "main": "src/main",
