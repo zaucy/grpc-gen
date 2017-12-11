@@ -1,7 +1,8 @@
 {
-	"files": [
+	"srcs_dir": "./src",
+	"srcs": [
 		"test.proto"
 	],
-	"node_out": "server",
-	"web_out": "browser"
+	"node_out": "./server",
+	"web_out": "./browser"
 }
