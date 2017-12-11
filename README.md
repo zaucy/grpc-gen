@@ -5,7 +5,7 @@ Create a `.grpc-gen` file such as this
 {
 	"srcs_dir": "./protos",
 	"srcs": [
-		"./protos/example.proto"
+		"example.proto"
 	],
 	"web_out": "./browser",
 	"node_out": "./server"
