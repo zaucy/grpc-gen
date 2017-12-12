@@ -102,6 +102,11 @@ async function genJsIndex(dir) {
 		`module.exports = Object.assign({},` + files.map(file => {
 			let filename = path.basename(file, '.js');
 			let dirname = path.dirname(file);
+
+			if(dirname.startsWith('.')) {
+				dirname = dirname.substr(1);
+			}
+
 			return `\n\trequire("./${dirname}${filename}")`;
 		}).join(',') +
 		`\n);\n`
