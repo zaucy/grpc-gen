@@ -119,11 +119,13 @@ async function gen() {
 		node_protoc_plugin,
 		protoc_gen_web_ts_plugin,
 		tsc_exec,
+		protoc_gen_ngx,
 	] = await Promise.all([
 		which("grpc_tools_node_protoc"),
 		which("grpc_tools_node_protoc_plugin"),
 		which("protoc-gen-ts"),
 		which("tsc"),
+		which("protoc-gen-ngx"),
 	]);
 
 	async function genNode() {
@@ -264,9 +266,75 @@ async function gen() {
 		await genWebIndex();
 	}
 
+	async function genNgx() {
+
+		// ngx is optional
+		if(!config.ngx_out) {
+			return;
+		}
+
+		const ngx_out = path.resolve(path.dirname(CONFIG_PATH), config.ngx_out);
+
+		await fse.emptyDir(ngx_out);
+		await fse.ensureDir(ngx_out);
+
+		async function genNgxTs() {
+			let args =  [].concat(
+				config.srcs,
+				[`--ngx_out=${ngx_out}`],
+				[`--plugin=protoc-gen-ngx=${protoc_gen_ngx}`],
+				[`--proto_path=${tmpSrcsDir}`],
+				[`--proto_path=${tmpIncludesDir}`],
+			);
+
+			let options = {
+				stdio: 'inherit',
+				cwd: tmpSrcsDir,
+			};
+
+			return spawnAsync(protoc, args, options);
+		}
+
+		async function genNgxModule() {
+
+		}
+
+		async function genNgxIndex() {
+
+		}
+
+		async function genNgxJs(dir = ngx_out) {
+			let files = await fse.readdir(dir);
+
+			for(let file of files) {
+				let stat = await fse.stat(file).catch(err => {
+					// Ignore non-existant files
+				});
+				if(stat && stat.isDirectory()) {
+					await genWebIndex(path.resolve(dir, file));
+				}
+			}
+
+			files = files.filter(file => {
+				return file.endsWith('.ts');
+			});
+
+			await spawnAsync(tsc_exec, ['-d'].concat(files), {
+				stdio: 'inherit',
+				cwd: dir
+			});
+		}
+
+		await genNgxTs();
+		// await genNgxModule();
+		// await genNgxIndex();
+		// await genNgxJs();
+	}
+
 	await Promise.all([
 		genNode(),
 		genWeb(),
+		genNgx(),
 	]);
 }
 

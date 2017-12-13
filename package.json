@@ -14,11 +14,14 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@angular/compiler": "^5.1.0",
+    "@angular/compiler-cli": "^5.1.0",
     "@types/google-protobuf": "^3.2.7",
     "fs-extra": "^4.0.2",
     "google-protobuf": "^3.4.0",
     "grpc": "^1.7.1",
     "grpc-tools": "^1.6.6",
+    "protoc-gen-ngx": "0.0.1",
     "tmp": "0.0.33",
     "ts-protoc-gen": "^0.4.0",
     "typescript": "^2.6.1"
