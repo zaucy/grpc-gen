@@ -274,9 +274,11 @@ async function gen() {
 		}
 
 		const ngx_out = path.resolve(path.dirname(CONFIG_PATH), config.ngx_out);
+		const ngxWebOut = path.resolve(ngx_out, "_grpc-gen_web_out");
 
 		await fse.emptyDir(ngx_out);
 		await fse.ensureDir(ngx_out);
+		await fse.ensureDir(ngxWebOut);
 
 		async function genNgxTs() {
 			let args =  [].concat(
@@ -325,16 +327,21 @@ async function gen() {
 			});
 		}
 
+		async function copyWebForNgx() {
+			await fse.copy(web_out, ngxWebOut);
+		}
+
 		await genNgxTs();
 		// await genNgxModule();
 		// await genNgxIndex();
 		// await genNgxJs();
+		await copyWebForNgx();
 	}
 
 	await Promise.all([
 		genNode(),
-		genWeb(),
-		genNgx(),
+		// ngx depends on web
+		genWeb().then(() => genNgx()),
 	]);
 }
 

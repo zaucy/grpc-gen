@@ -4,5 +4,6 @@
 		"test.proto"
 	],
 	"node_out": "./server",
-	"web_out": "./browser"
+	"web_out": "./browser",
+	"ngx_out": "./ngx"
 }
