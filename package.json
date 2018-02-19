@@ -4,9 +4,7 @@
   "bin": "src/cli.js",
   "description": "Simple CLI for generating stubs for gRPC Node. and grpc-web-client",
   "main": "src/main",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "scripts": {},
   "author": "Ezekiel Warren",
   "repository": "github:zaucy/grpc-gen",
   "bugs": {
