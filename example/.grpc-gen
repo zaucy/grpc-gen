@@ -5,5 +5,6 @@
 	],
 	"node_out": "./server",
 	"web_out": "./browser",
-	"ngx_out": "./ngx"
+	"ngx_out": "./ngx",
+	"doc_out": "./docs"
 }

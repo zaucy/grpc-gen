@@ -338,7 +338,37 @@ async function gen() {
 		await copyWebForNgx();
 	}
 
+	async function genDoc() {
+		// Ignore if no doc_out is specified
+		if(!config.doc_out) {
+			return;
+		}
+
+		const doc_out = path.resolve(path.dirname(CONFIG_PATH), config.doc_out);
+		// const protoc_gen_doc_exec = await which("protoc-gen-doc");
+		const protoc_gen_doc_exec = `C:\\Users\\zekew\\go\\bin\\protoc-gen-doc.exe`;
+
+		await fse.emptyDir(doc_out);
+		await fse.ensureDir(doc_out);
+
+		let args = [].concat(
+			config.srcs,
+			[`--doc_out=${doc_out}`],
+			[`--doc_opt=html,index.html`],
+			[`--plugin=protoc-gen-doc=${protoc_gen_doc_exec}`],
+			[`--proto_path=${tmpSrcsDir}`],
+			[`--proto_path=${tmpIncludesDir}`],
+		);
+		let options = {
+			stdio: 'inherit',
+			cwd: tmpSrcsDir,
+		};
+
+		return spawnAsync(protoc, args, options);
+	}
+
 	await Promise.all([
+		genDoc(),
 		genNode(),
 		// ngx depends on web
 		genWeb().then(() => genNgx()),

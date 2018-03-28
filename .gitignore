@@ -2,5 +2,6 @@
 /example/browser
 /example/server
 /example/ngx
+/example/docs
 
 /node_modules
