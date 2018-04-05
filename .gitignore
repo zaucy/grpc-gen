@@ -1,6 +1,4 @@
 # Generated files from example
-/example/browser
-/example/server
-/example/ngx
+/example/dist
 
 /node_modules

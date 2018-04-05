@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+message DeepProto {
+
+}
+
+service Deep {
+  rpc GoDeep(DeepProto) returns (DeepProto) {};
+}

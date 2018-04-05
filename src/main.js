@@ -81,33 +81,40 @@ let tmpDir = '';
 let tmpSrcsDir = '';
 let tmpIncludesDir = '';
 
-async function genJsIndex(dir) {
+async function genJsIndex(dir, rootDir) {
+	rootDir = rootDir || dir;
+
 	let files = await fse.readdir(dir);
 
-	for(let file of files) {
-		let stat = await fse.stat(file).catch(err => {
+	for(let index in files) {
+		let file = files[index];
+		let fullPath = path.resolve(dir, file);
+		let stat = await fse.stat(fullPath).catch(err => {
 			// Ignore non-existant files
 		});
-		if(stat && stat.isDirectory()) {
-			await genJsIndex(path.resolve(dir, file));
-		}
-	}
 
-	files = files.filter(file => {
-		return file.endsWith('.js');
-	});
+		if(stat && stat.isDirectory()) {
+			await genJsIndex(fullPath, rootDir);
+			files[index] = fullPath + "/index.js";
+		} else {
+			files[index] = fullPath;
+		}
+
+		files[index] = path.relative(dir, files[index]);
+	}
 
 	await fse.writeFile(
 		path.resolve(dir, 'index.js'),
 		`module.exports = Object.assign({},` + files.map(file => {
 			let filename = path.basename(file, '.js');
 			let dirname = path.dirname(file);
+			let requirePath = `./${dirname}/${filename}`;
 
-			if(dirname.startsWith('.')) {
-				dirname = dirname.substr(1);
+			if(requirePath.startsWith("././")) {
+				requirePath = requirePath.substr(2);
 			}
 
-			return `\n\trequire("./${dirname}${filename}")`;
+			return `\n\trequire("${requirePath}")`;
 		}).join(',') +
 		`\n);\n`
 	);

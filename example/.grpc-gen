@@ -1,9 +1,10 @@
 {
 	"srcs_dir": "./src",
 	"srcs": [
-		"test.proto"
+		"test.proto",
+		"deep/deep.proto"
 	],
-	"node_out": "./server",
-	"web_out": "./browser",
-	"ngx_out": "./ngx"
+	"node_out": "./dist/node",
+	"web_out": "./dist/web",
+	"ngx_out": "./dist/ngx"
 }
