@@ -5,5 +5,5 @@ message TestMessage {
 }
 
 service TestService {
-	rpc test(TestMessage) returns(TestMessage) {};
+	rpc tes t(TestMessage) returns(TestMessage) {};
 }

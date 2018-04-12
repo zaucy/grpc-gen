@@ -12,16 +12,20 @@
   },
   "license": "ISC",
   "dependencies": {
-    "@angular/compiler": "^5.1.0",
-    "@angular/compiler-cli": "^5.1.0",
+    "@angular/compiler": "^5.2.9",
+    "@angular/compiler-cli": "^5.2.9",
     "@types/google-protobuf": "^3.2.7",
-    "fs-extra": "^4.0.2",
-    "google-protobuf": "^3.4.0",
-    "grpc": "^1.7.1",
+    "fs-extra": "^5.0.0",
+    "google-protobuf": "^3.5.0",
+    "grpc": "^1.10.1",
     "grpc-tools": "^1.6.6",
+    "js-yaml": "^3.11.0",
     "protoc-gen-ngx": "~0.0.3",
     "tmp": "0.0.33",
-    "ts-protoc-gen": "^0.4.0",
-    "typescript": "^2.6.1"
+    "ts-protoc-gen": "^0.5.2",
+    "typescript": "^2.8.1"
+  },
+  "devDependencies": {
+    "colors": "^1.2.1"
   }
 }

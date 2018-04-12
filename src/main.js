@@ -4,6 +4,8 @@ const path = require("path");
 const util = require("util");
 const {spawn} = require("child_process");
 const {which} = require("./which.js");
+const colors = require("colors");
+const yaml = require("js-yaml");
 
 const GOOGLE_PROTOS = path.resolve(
 	path.dirname(require.resolve("grpc-tools")),
@@ -12,15 +14,56 @@ const GOOGLE_PROTOS = path.resolve(
 
 function spawnAsync(exec, args, options) {
 	return new Promise((resolve, reject) => {
+		let stderr = '';
+		let stdout = '';
 		let child = spawn(exec, args, options);
+
+		if(child.stdout) {
+			child.stdout.on('data', chunk => stdout += chunk.toString());
+		}
+
+		if(child.stderr) {
+			child.stderr.on('data', chunk => stderr += chunk.toString());
+		}
+
 		child.on("exit", code => {
 			if(code !== 0) {
-				reject(code);
+				reject(stderr);
 			} else {
-				resolve();
+				resolve(stdout);
 			}
 		});
 	});
+}
+
+function findConfigPath() {
+	let cwd = process.cwd();
+	const configNames = [
+		'.grpc-gen.json',
+		'.grpc-gen.yaml',
+		'.grpc-gen.yml',
+		'.grpc-gen.js',
+		'.grpc-gen'
+	];
+
+	return configNames.find((configName) => {
+		return fse.existsSync(path.resolve(cwd, configName));
+	}) || configNames[0];
+}
+
+function readConfig(configPath) {
+	let extname = path.extname(configPath);
+	switch(extname) {
+		case '.yml':
+		case '.yaml':
+			return yaml.safeLoad(fse.readFileSync(configPath));
+		case '.js':
+			return require(configPath);
+		default:
+			console.warn(colors.yellow("DEPRECATED") + `: .grpc-gen config file without extension will be removed in next major version. Please switch to .grpc-gen.json or .grpc-gen.yaml`);
+		case '.json':
+			return fse.readJsonSync(configPath);
+	}
 }
 
 if(require.main === module) {
@@ -31,13 +74,13 @@ if(require.main === module) {
 const DEFAULT_CONFIG = {
 };
 
-const CONFIG_PATH = path.resolve(process.cwd(), ".grpc-gen");
-
+const CONFIG_PATH = findConfigPath();
+const CONFIG_DIR = path.dirname(CONFIG_PATH);
 
 let config = null;
 
 try {
-	config = fse.readJsonSync(CONFIG_PATH);
+	config = readConfig(CONFIG_PATH);
 } catch(err) {
 	console.error(`Unable to load '${CONFIG_PATH}'`);
 	console.error(err);
@@ -73,10 +116,10 @@ if(!config.srcs_dir) {
 	console.error("Missing 'srcs_dir' in .grcp-gen config");
 }
 
-const SRCS_DIR = path.resolve(path.dirname(CONFIG_PATH), config.srcs_dir);
+const SRCS_DIR = path.resolve(CONFIG_DIR, config.srcs_dir);
 
-let node_out = path.resolve(path.dirname(CONFIG_PATH), config.node_out);
-let web_out = path.resolve(path.dirname(CONFIG_PATH), config.web_out);
+let node_out = path.resolve(CONFIG_DIR, config.node_out);
+let web_out = path.resolve(CONFIG_DIR, config.web_out);
 let tmpDir = '';
 let tmpSrcsDir = '';
 let tmpIncludesDir = '';
@@ -118,6 +161,41 @@ async function genJsIndex(dir, rootDir) {
 		}).join(',') +
 		`\n);\n`
 	);
+}
+
+async function checkSyntax() {
+	const dummyExt = process.platform == 'win32' ? '.cmd' : '';
+	const protoc = await which("grpc_tools_node_protoc");
+	const dummyProtocPlugin = path.resolve(__dirname, 'dummy' + dummyExt);
+	let args =  [].concat(config.srcs, [
+		'--dummy_out=./',
+		`--plugin=protoc-gen-dummy=${dummyProtocPlugin}`
+	]);
+	let options = {
+		cwd: tmpSrcsDir,
+	};
+
+	return spawnAsync(protoc, args, options).catch(err => {
+		let errLines = err.split('\n');
+		let errLineKeys = {};
+
+		errLines.forEach(errLine => {
+			for(let src of config.srcs) {
+				if(errLine.startsWith(src)) {
+					errLineKeys[errLine.trim()] = true;
+					return;
+				}
+			}
+		});
+
+		let msg = Object.keys(errLineKeys).map(errLine => {
+			return path.relative(CONFIG_DIR, path.resolve(SRCS_DIR, errLine));
+			// return 'example/src/' + errLine;
+		}).join('\n');
+		let syntaxError = new Error(msg);
+		syntaxError.protoSyntaxErr = true;
+		return Promise.reject(syntaxError);
+	});
 }
 
 async function gen() {
@@ -280,7 +358,7 @@ async function gen() {
 			return;
 		}
 
-		const ngx_out = path.resolve(path.dirname(CONFIG_PATH), config.ngx_out);
+		const ngx_out = path.resolve(CONFIG_DIR, config.ngx_out);
 		const ngxWebOut = path.resolve(ngx_out, "_grpc-gen_web_out");
 
 		await fse.emptyDir(ngx_out);
@@ -381,6 +459,7 @@ async function startGen() {
 		copyIncludes(GOOGLE_PROTOS, "google"),
 	]);
 
+	await checkSyntax();
 	await gen();
 	await fse.remove(tmpDirPath).catch(err => {
 		// Don't fail the build just because we couldn't clean up.
@@ -388,5 +467,11 @@ async function startGen() {
 }
 
 startGen().catch(err => {
-	console.error("grpc-gen failed to compile", err);
+	if(err.protoSyntaxErr) {
+		console.error(err.message.split('\n').map(errLine => {
+			return colors.red('ERROR') + ': ' + errLine;
+		}).join('\n'));
+	} else {
+		console.error(err);
+	}
 });
