@@ -146,6 +146,10 @@ async function genJsIndex(dir, rootDir) {
 		files[index] = path.relative(dir, files[index]);
 	}
 
+	files = files.filter(filepath => {
+		return filepath.endsWith(".js") || filepath.endsWith("index");
+	});
+
 	await fse.writeFile(
 		path.resolve(dir, 'index.js'),
 		`module.exports = Object.assign({},` + files.map(file => {
@@ -160,6 +164,48 @@ async function genJsIndex(dir, rootDir) {
 			return `\n\trequire("${requirePath}")`;
 		}).join(',') +
 		`\n);\n`
+	);
+}
+
+async function genDtsIndex(dir, rootDir) {
+	rootDir = rootDir || dir;
+
+	let files = await fse.readdir(dir);
+
+	for(let index in files) {
+		let file = files[index];
+		let fullPath = path.resolve(dir, file);
+		let stat = await fse.stat(fullPath).catch(err => {
+			// Ignore non-existant files
+		});
+
+		if(stat && stat.isDirectory()) {
+			await genDtsIndex(fullPath, rootDir);
+			files[index] = fullPath + "/index";
+		} else {
+			files[index] = fullPath;
+		}
+
+		files[index] = path.relative(dir, files[index]);
+	}
+
+	files = files.filter(filepath => {
+		return filepath.endsWith(".d.ts") || filepath.endsWith("index");
+	});
+
+	await fse.writeFile(
+		path.resolve(dir, 'index.d.ts'), files.map(file => {
+			let filename = path.basename(file, '.d.ts');
+			let dirname = path.dirname(file);
+			let requirePath = `./${dirname}/${filename}`;
+
+			if(requirePath.startsWith("././")) {
+				requirePath = requirePath.substr(2);
+			}
+
+			return `export * from "${requirePath}";`;
+		}).join('\n') +
+		`\n`
 	);
 }
 
@@ -348,7 +394,9 @@ async function gen() {
 
 		await genWebTs();
 		await genWebJs();
-		await genWebIndex();
+		await genDtsIndex(web_out);
+		await genJsIndex(web_out); 
+		// await genWebIndex(web_out);
 	}
 
 	async function genNgx() {
