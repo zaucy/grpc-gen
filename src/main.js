@@ -521,7 +521,7 @@ startGen().catch(err => {
 		if(!err.message.trim()) {
 			console.warn("[WARN] No error message, but protoSyntaxError was set.");
 			console.warn(err.originalError);
-			process.exit(0);
+			process.exit(1);
 		}
 
 		let errMsg = err.message.split('\n').map(errLine => {
