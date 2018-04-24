@@ -210,7 +210,7 @@ async function genDtsIndex(dir, rootDir) {
 }
 
 async function checkSyntax() {
-	const dummyExt = process.platform == 'win32' ? '.cmd' : '';
+	const dummyExt = process.platform == 'win32' ? '.cmd' : '.sh';
 	const protoc = await which("grpc_tools_node_protoc");
 	const dummyProtocPlugin = path.resolve(__dirname, 'dummy' + dummyExt);
 	let args =  [].concat(config.srcs, [
