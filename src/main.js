@@ -519,6 +519,7 @@ startGen().catch(err => {
 		console.error(err.message.split('\n').map(errLine => {
 			return colors.red('ERROR') + ': ' + errLine;
 		}).join('\n'));
+		process.exit(1);
 	} else {
 		console.error(err);
 	}
