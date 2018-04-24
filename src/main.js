@@ -240,6 +240,7 @@ async function checkSyntax() {
 		}).join('\n');
 		let syntaxError = new Error(msg);
 		syntaxError.protoSyntaxErr = true;
+		syntaxError.originalError = err;
 		return Promise.reject(syntaxError);
 	});
 }
@@ -516,9 +517,18 @@ async function startGen() {
 
 startGen().catch(err => {
 	if(err.protoSyntaxErr) {
-		console.error(err.message.split('\n').map(errLine => {
+
+		if(!err.message.trim()) {
+			console.warn("[WARN] No error message, but protoSyntaxError was set.");
+			console.warn(err.originalError);
+			process.exit(0);
+		}
+
+		let errMsg = err.message.split('\n').map(errLine => {
 			return colors.red('ERROR') + ': ' + errLine;
-		}).join('\n'));
+		}).join('\n');
+
+		console.error(errMsg);
 	} else {
 		console.error(err);
 	}
