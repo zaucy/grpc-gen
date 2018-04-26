@@ -21,7 +21,7 @@
     "grpc": "^1.10.1",
     "grpc-tools": "^1.6.6",
     "js-yaml": "^3.11.0",
-    "protoc-gen-ngx": "~0.0.4",
+    "protoc-gen-ngx": "^0.1.1",
     "tmp": "0.0.33",
     "ts-protoc-gen": "^0.5.2",
     "typescript": "^2.8.1"
