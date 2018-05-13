@@ -2,3 +2,4 @@
 /example/dist
 
 /node_modules
+/src/bin
