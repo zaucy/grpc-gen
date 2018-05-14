@@ -8,7 +8,6 @@ const yaml = require("js-yaml");
 const chokidar = require("chokidar");
 const {spawn} = require("child_process");
 const {Bar} = require("cli-progress");
-const gccOutputParser = require('gcc-output-parser');
 
 const {GrpcGenError, ConfigError} = require("./error");
 const {getOuputAdapter, runDummyOutput} = require("./outputAdapter/");;

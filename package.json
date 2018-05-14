@@ -1,6 +1,6 @@
 {
   "name": "grpc-gen",
-  "version": "1.0.0-0",
+  "version": "0.0.0",
   "bin": "src/cli.js",
   "description": "Simple CLI for running the protoc compiler via configuration file",
   "main": "src/main",
@@ -16,12 +16,8 @@
     "cli-progress": "^1.8.0",
     "colors": "^1.2.5",
     "fs-extra": "^6.0.1",
-    "gcc-output-parser": "0.0.4",
-    "grpc-tools": "^1.6.6",
     "js-yaml": "^3.11.0",
-    "protoc-gen-ngx": "^0.1.1",
     "tmp": "0.0.33",
-    "ts-protoc-gen": "^0.6.0",
     "unzip": "^0.1.11",
     "which": "^1.3.0",
     "yargs": "^11.0.0"
