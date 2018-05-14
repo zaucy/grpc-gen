@@ -279,6 +279,7 @@ async function main() {
 			`Could not find protoc. Downloading protoc ${protocVersion} ...`
 		);
 		await downloadProtoc(protocVersion);
+		await fs.chmod(protoc, '755');
 	} else {
 		logVerbose(
 			`Found protoc. Using protoc ${protocVersion}`
