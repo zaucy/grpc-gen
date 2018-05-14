@@ -7,6 +7,6 @@ srcs:
 output:
   js: dist/node
   ts: dist/node
-  grpc-web: dist/web
+  # grpc-web: dist/web
   ngx: dist/ngx
 
