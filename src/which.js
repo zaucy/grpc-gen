@@ -2,11 +2,15 @@ const {GrpcGenError} = require("./error");
 const path = require("path");
 const fs = require("fs-extra");
 const which = require("which");
+const {logVerbose} = require("./log");
 
-const DEFAULT_DIR = path.resolve(__dirname, "..");
 const BIN_EXTS = process.platform == 'win32' ? ['.exe', '.cmd'] : ['.sh', ''];
 
-const npmBinWhich = async (command, dir = DEFAULT_DIR) => {
+const npmBinWhich = async (command, dir) => {
+
+	if(!dir) {
+		dir = process.cwd();
+	}
 
 	if(!await fs.exists(dir)) {
 		return Promise.reject(new GrpcGenError(
@@ -28,6 +32,8 @@ const npmBinWhich = async (command, dir = DEFAULT_DIR) => {
 
 	let binDir = path.resolve(dir, "node_modules/.bin");
 
+	logVerbose(`Looking for '${command}' in '${binDir}'`);
+
 	if(await fs.exists(binDir)) {
 		let files = await fs.readdir(binDir);
 		let commandPath = files.filter(file => {
@@ -45,6 +51,7 @@ const npmBinWhich = async (command, dir = DEFAULT_DIR) => {
 
 		if(commandPath.length > 0) {
 			commandPath = commandPath.sort((a,b) => a.length < b.length);
+			logVerbose(`FOUND '${command}' in '${binDir}'`);
 			return path.resolve(binDir, commandPath[0]);
 		}
 
@@ -68,8 +75,11 @@ exports.which = async (command) => {
 	});
 
 	if(pathWhich) {
+		logVerbose(`FOUND '${command}' in PATH`);
 		return pathWhich;
 	}
+
+	logVerbose(`Could not find '${command}' in PATH. Moving onto npm bin paths.`);
 
 	return npmBinWhich(command).catch(() => {
 		return Promise.reject(new GrpcGenError(
