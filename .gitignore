@@ -1,5 +1,6 @@
-# Generated files from example
-/example/dist
+# Editor Files
+/.vs
+/.vscode
 
 /node_modules
-/src/bin
+/bin

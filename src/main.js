@@ -5,49 +5,30 @@ const fs = require("fs-extra");
 const path = require("path");
 const colors = require("colors");
 const yaml = require("js-yaml");
+const chokidar = require("chokidar");
 const {spawn} = require("child_process");
 const {Bar} = require("cli-progress");
+const gccOutputParser = require('gcc-output-parser');
 
+const {GrpcGenError, ConfigError} = require("./error");
+const {getOuputAdapter, runDummyOutput} = require("./outputAdapter/");;
+const {logVerbose} = require("./log");
+const {argv} = require("./argv");
 
 const DEFAULT_PROTOC_VERSION = "3.5.1";
-const BIN_DIR = path.resolve(__dirname, "bin");
-const BUILT_IN_OUTPUTS = [
-	"cpp",
-	"csharp",
-	"java",
-	"javanano",
-	"objc",
-	"php",
-	"python",
-	"ruby",
+const BIN_DIR = path.resolve(__dirname, "../bin");
+
+const defaultConfigNames = [
+	'.grpc-gen.json',
+	'.grpc-gen.yaml',
+	'.grpc-gen.yml',
+	'.grpc-gen.js',
 ];
 
-const argv = require("yargs")
-	.option('config', {
-		describe: "Override default config file lookup with explicit path",
-		type: "string"
-	})
-	.option('verbose', {
-		alias: ['v'],
-		describe: "Verbose logging. Useful for debugging.",
-		type: "boolean"
-	})
-	.completion()
-	.argv;
-
-class GrpcGenError extends Error {};
-
-class ConfigError extends GrpcGenError {
-	constructor(msg) {
-		super(msg);
-	}
-};
-
-function logVerbose(...args) {
-	if(argv.verbose) {
-		console.log(colors.grey("[VERBOSE]"), ...args);
-	}
-}
+let config;
+let configDir;
+let watcher;
+let lastWatchSrcs = [];
 
 function spawnAsync(exec, args, options) {
 	return new Promise((resolve, reject) => {
@@ -186,14 +167,8 @@ function findConfigPath() {
 	}
 
 	let cwd = process.cwd();
-	const configNames = [
-		'.grpc-gen.json',
-		'.grpc-gen.yaml',
-		'.grpc-gen.yml',
-		'.grpc-gen.js',
-	];
 
-	return configNames.find((configName) => {
+	return defaultConfigNames.find((configName) => {
 		logVerbose(`Looking for config '${configName}'`);
 		return fs.existsSync(path.resolve(cwd, configName));
 	}) || null;
@@ -234,9 +209,11 @@ async function main() {
 		throw new ConfigError(`grpc-gen config file not found`);
 	}
 
+	configDir = path.dirname(configPath);
+
 	logVerbose(`Using config '${configPath}'`);
 
-	let config = await readConfig(configPath);
+	config = await readConfig(configPath);
 
 	if(typeof config.output != "object" || Object.keys(config.output).length == 0) {
 		throw new ConfigError('Config must specify at least 1 output');
@@ -252,6 +229,19 @@ async function main() {
 
 	} else {
 		// Automatically determine srcs_dir
+	}
+
+	if(watcher) {
+
+		watcher.unwatch(lastWatchSrcs);
+		lastWatchSrcs = [];
+
+		for(let src of config.srcs) {
+			let srcAbs = path.resolve(configDir, config.srcs_dir, src);
+			lastWatchSrcs.push(srcAbs);
+		}
+
+		watcher.add(lastWatchSrcs);
 	}
 
 	let protocVersion = DEFAULT_PROTOC_VERSION;
@@ -298,33 +288,134 @@ async function main() {
 
 	logVerbose(`protoc binary '${protoc}'`);
 
-	let protocArgs = [];
+	let srcsDirAbs = path.resolve(configDir, config.srcs_dir);
+	let outputAdapters = [];
+	let adapterOptions = {
+		protoc: protoc,
+		protocVersion: protocVersion,
+		srcs: config.srcs,
+		srcs_dir: config.srcs_dir,
+	};
+
+	// Run the dummy plugin just to check for syntax errors.
+	logVerbose("Running dummy plugin for syntax errors");
+	await runDummyOutput(Object.assign({}, adapterOptions));
 
 	for(let outName in config.output) {
 		let outOpts = config.output[outName];
 		let outDir = "";
+		let outDirAbs = "";
 		if(typeof outOpts == "string") {
 			outDir = outOpts;
+			outOpts = {};
 		}
 
-		protocArgs.push(`--${outName}_out=${outDir}`);
+		outDirAbs = outDir;
+
+		if(!path.isAbsolute(outDir)) {
+			outDirAbs = path.resolve(configDir, outDir);
+		}
+
+		outDir = path.relative(srcsDirAbs, outDirAbs);
+
+		logVerbose("Output directory:", outDirAbs);
+
+		outDir = outDir.replace(/\\/g, '/');
+
+		for(let src of config.srcs) {
+			let srcDirname = path.join(
+				path.dirname(src),
+				path.basename(src) + ".grpc.pb.js"
+			);
+
+			await fs.ensureDir(path.resolve(outDirAbs, path.dirname(srcDirname)));
+		}
+
+		let adapter = getOuputAdapter(outName, Object.assign({}, adapterOptions, {
+			outputPath: outDir,
+			options: outOpts,
+		}));
+
+		outputAdapters.push(adapter);
 	}
 
-	for(let src of config.srcs) {
-		protocArgs.push(src);
-	}
-
-	await spawnAsync(protoc, protocArgs);
+	await Promise.all(outputAdapters.map(a => a.run()));
 }
 
-main()
-	.then(() => {
-		console.log(colors.green("DONE"));
-	})
-	.catch(err => {
-		if(err instanceof GrpcGenError) {
-			console.error(colors.red("[ERROR] ") + err.message);
+function parseOutputError(err = '') {
+
+	let errLines = err.split("\n");
+	let retErrMsg = '';
+
+	for(let errLine of errLines) {
+		errLine = errLine.trim();
+
+		let errorPattern = /(\S+):(\d+):(\d+):(.*)+$/gm;
+		let errComponents = errorPattern.exec(errLine);
+		if(!errComponents) {
+			retErrMsg += errLine + '\n';
+			continue;
+		}
+	
+		let [fullErr, filename, line, column, error] = errComponents;
+		
+		retErrMsg += colors.red('[ERROR] ') + fullErr + '\n';
+	}
+
+	return retErrMsg;
+}
+
+async function doMain() {
+	return main()
+		.then(() => {
+			console.log(colors.green("DONE"));
+		})
+		.catch(err => {
+
+			if(typeof err == "string") {
+				console.error(parseOutputError(err).trim());
+			} else
+			if(err instanceof GrpcGenError) {
+				console.error(colors.red("[ERROR] ") + err.message);
+			} else {
+				console.error(err);
+			}
+		});
+}
+
+async function doMainWatch() {
+	let waiting = false;
+	let currentMainPromise = doMain().then(afterMain, afterMain);
+
+	function afterMain() {
+		currentMainPromise = null;
+		if(waiting) {
+			waiting = false;
+			currentMainPromise = doMain().then(afterMain, afterMain);
 		} else {
-			console.error(err);
+			console.log("Waiting for changes ...");
+		}
+	}
+	
+	watcher = chokidar.watch();
+
+	if(argv.config) {
+		watcher.add(argv.config);
+	} else {
+		watcher.add(defaultConfigNames);
+	}
+
+	watcher.on("change", async (e) => {
+		if(!currentMainPromise) {
+			currentMainPromise = doMain().then(afterMain, afterMain);
+		} else {
+			waiting = true;
 		}
 	});
+}
+
+if(argv.watch) {
+	doMainWatch();
+} else {
+	doMain();
+}
