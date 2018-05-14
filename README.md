@@ -15,3 +15,52 @@ srcs:
 output:
   plugin-name: output-directory
 ```
+
+## Install
+
+Install globally
+
+```bash
+npm i -g grpc-gen
+```
+
+OR install locally in your project as a dev dependency and add a build script to your `package.json`.
+
+```bash
+npm i -D grpc-gen
+```
+
+```js
+// package.json
+"scripts": {
+  "build": "grpc-gen"
+},
+"devDependencies": [
+  "grpc-gen": "^1.0.0-0"
+]
+```
+
+```bash
+npm run build
+```
+
+## Usage
+
+Running `grpc-gen` in the directory containing your configuration file will build your proto files.
+
+```bash
+grpc-gen
+```
+
+You can also specify a different configuration file with `--config`
+
+```bash
+# Extension can be: .yml .yaml .json .js
+grpc-gen --config=custom-config.yml
+```
+
+`grpc-gen` may also run in *watch* mode. When your config file or proto files change compilation will re-run.
+
+```
+grpc-gen --watch
+```
