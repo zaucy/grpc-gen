@@ -1,29 +1,59 @@
-const fse = require("fs-extra");
-const tmp = require("tmp");
+const https = require("https");
+const stream = require("stream");
+const unzip = require("unzip");
+const fs = require("fs-extra");
 const path = require("path");
-const util = require("util");
-const {spawn} = require("child_process");
-const {which} = require("./which.js");
 const colors = require("colors");
 const yaml = require("js-yaml");
+const chokidar = require("chokidar");
+const {spawn} = require("child_process");
+const {Bar} = require("cli-progress");
 
-const GOOGLE_PROTOS = path.resolve(
-	path.dirname(require.resolve("grpc-tools")),
-	"bin/google"
-);
+const {GrpcGenError, ConfigError} = require("./error");
+const {getOuputAdapter, runDummyOutput} = require("./outputAdapter/");;
+const {logVerbose} = require("./log");
+const {argv} = require("./argv");
+
+const DEFAULT_PROTOC_VERSION = "3.5.1";
+const BIN_DIR = path.resolve(__dirname, "../bin");
+
+const defaultConfigNames = [
+	'.grpc-gen.json',
+	'.grpc-gen.yaml',
+	'.grpc-gen.yml',
+	'.grpc-gen.js',
+];
+
+let config;
+let configDir;
+let watcher;
+let lastWatchSrcs = [];
 
 function spawnAsync(exec, args, options) {
 	return new Promise((resolve, reject) => {
 		let stderr = '';
 		let stdout = '';
+		logVerbose(colors.blue('[SPAWN]'), exec, ...args);
 		let child = spawn(exec, args, options);
 
 		if(child.stdout) {
-			child.stdout.on('data', chunk => stdout += chunk.toString());
+			child.stdout.on('data', chunk => {
+				stdout += chunk.toString();
+				
+				if(argv.verbose) {
+					process.stdout.write(chunk);
+				}
+			});
 		}
 
 		if(child.stderr) {
-			child.stderr.on('data', chunk => stderr += chunk.toString());
+			child.stderr.on('data', chunk => {
+				stderr += chunk.toString();
+
+				if(argv.verbose) {
+					process.stderr.write(chunk);
+				}
+			});
 		}
 
 		child.on("exit", code => {
@@ -36,502 +66,360 @@ function spawnAsync(exec, args, options) {
 	});
 }
 
-function findConfigPath() {
-	let cwd = process.cwd();
-	const configNames = [
-		'.grpc-gen.json',
-		'.grpc-gen.yaml',
-		'.grpc-gen.yml',
-		'.grpc-gen.js',
-		'.grpc-gen'
-	];
+async function downloadProtoc(version) {
+	const prefix = `https://github.com/google/protobuf/releases/download/`;
+	let platform = '';
+	let arch = '';
 
-	return configNames.find((configName) => {
-		return fse.existsSync(path.resolve(cwd, configName));
-	}) || configNames[0];
+	switch(process.platform) {
+		case 'darwin':
+			platform = 'osx-';
+			switch(process.arch) {
+				case 'x64':
+					platform += 'x86_64'; 
+					break;
+				case 'x32':
+					platform += 'x86_32';
+					break;
+				default:
+					throw new GrpcGenError(
+						`Cannot download protoc for platform '${process.platform}' with ` +
+						`arch ${process.arch}`
+					);
+			}
+			break;
+		case 'linux':
+			platform = 'linux-';
+			switch(process.arch) {
+				case 'x64':
+					platform += 'x86_64'; 
+					break;
+				case 'x32':
+					platform += 'x86_32';
+					break;
+				case 'arm64':
+					platform += 'aarch_64';
+					break;
+				default:
+					throw new GrpcGenError(
+						`Cannot download protoc for platform '${process.platform}' with ` +
+						`arch ${process.arch}`
+					);
+			}
+			break;
+		case 'cygwin':
+		case 'win32':
+			platform = 'win32';
+			break;
+		default:
+			throw new GrpcGenError(
+				`Cannot download protoc for platform '${process.platform}'`
+			);
+	}
+
+	const downloadUrl = prefix + `v${version}/protoc-${version}-${platform}.zip`;
+	const extractPath = path.resolve(BIN_DIR, `protoc-${version}`)
+
+	
+	await fs.ensureDir(BIN_DIR);
+	
+	let zipPath = path.resolve(BIN_DIR, `protoc-${version}.zip`)
+	let zipWriteStream = fs.createWriteStream(zipPath);
+
+	logVerbose(`Downloading '${downloadUrl}' -> '${zipPath}'`);
+
+	let bar = new Bar();
+	bar.start(100, 0);
+
+	return new Promise((resolve, reject) => {
+		https.get(downloadUrl, res => {
+			bar.update(1);
+	
+			https.get(res.headers.location, res => {
+				bar.update(5);
+				res.pipe(zipWriteStream).on('close', () => {
+					bar.update(75);
+					logVerbose(`Extracting '${zipPath}' -> '${extractPath}'`);
+					let zipReadStream = fs.createReadStream(zipPath);
+					zipReadStream.pipe(unzip.Extract({
+						path: extractPath
+					})).on("close", () => {
+						bar.update(95);
+						logVerbose(`Removing '${zipPath}'`);
+						fs.remove(zipPath).then(() => {
+							bar.update(100);
+							bar.stop();
+							resolve();
+						});
+					});
+				});
+			});
+		});
+	});
+
 }
 
-function readConfig(configPath) {
+function findConfigPath() {
+
+	if(argv.config) {
+		return argv.config;
+	}
+
+	let cwd = process.cwd();
+
+	return defaultConfigNames.find((configName) => {
+		logVerbose(`Looking for config '${configName}'`);
+		return fs.existsSync(path.resolve(cwd, configName));
+	}) || null;
+}
+
+async function readConfig(configPath) {
+
+	const errHandler = (err) => {
+		if(err.code == 'ENOENT') {
+			return Promise.reject(new ConfigError(
+				`Cannot open config file '${err.path}'`
+			));
+		} else {
+			return Promise.reject(err);
+		}
+	};
+
 	let extname = path.extname(configPath);
 	switch(extname) {
 		case '.yml':
 		case '.yaml':
-			return yaml.safeLoad(fse.readFileSync(configPath));
+			return yaml.safeLoad(await fs.readFile(configPath).catch(errHandler));
 		case '.js':
 			return require(configPath);
+			case '.json':
+			return await fs.readJson(configPath).catch(errHandler);
 		default:
-			console.warn(colors.yellow("DEPRECATED") + `: .grpc-gen config file without extension will be removed in next major version. Please switch to .grpc-gen.json or .grpc-gen.yaml`);
-		case '.json':
-			return fse.readJsonSync(configPath);
+			throw new ConfigError(
+				`Invalid config extension '${extname}'. ` +
+				`Must be .json, .yml, .yaml, or .js`
+			);
 	}
 }
 
-if(require.main === module) {
-	console.error("grpc-gen is not available as a module");
-	process.exit(1);
-}
+async function main() {
+	let configPath = findConfigPath();
+	if(!configPath) {
+		throw new ConfigError(`grpc-gen config file not found`);
+	}
 
-const DEFAULT_CONFIG = {
-};
+	configDir = path.dirname(configPath);
 
-const CONFIG_PATH = findConfigPath();
-const CONFIG_DIR = path.dirname(CONFIG_PATH);
+	logVerbose(`Using config '${configPath}'`);
 
-let config = null;
+	config = await readConfig(configPath);
 
-try {
-	config = readConfig(CONFIG_PATH);
-} catch(err) {
-	console.error(`Unable to load '${CONFIG_PATH}'`);
-	console.error(err);
-	process.exit(1);
-}
+	if(typeof config.output != "object" || Object.keys(config.output).length == 0) {
+		throw new ConfigError('Config must specify at least 1 output');
+	}
 
-config = Object.assign({}, DEFAULT_CONFIG, config);
+	if(!Array.isArray(config.srcs) || config.srcs.length == 0) {
+		throw new ConfigError(
+			'Config must specify at least 1 source proto file in srcs'
+		);
+	}
 
-if(!config.srcs) {
-	console.error("Missing 'srcs' in .grcp-gen config");
-	process.exit(1);
-}
+	if(config.srcs_dir) {
 
-if(!Array.isArray(config.srcs)) {
-	console.error(
-		`Expected array for 'srcs' in .grpc-gen config. ` +
-		`Got: ${config.srcs}`
-	);
-	process.exit(1);
-}
+	} else {
+		// Automatically determine srcs_dir
+	}
 
-if(!config.node_out) {
-	console.error("Missing 'node_out' in .grpc-gen config");
-	process.exit(1);
-}
+	if(watcher) {
 
-if(!config.web_out) {
-	console.error("Missing 'web_out' in .grpc-gen config");
-	process.exit(1);
-}
+		watcher.unwatch(lastWatchSrcs);
+		lastWatchSrcs = [];
 
-if(!config.srcs_dir) {
-	console.error("Missing 'srcs_dir' in .grcp-gen config");
-}
-
-const SRCS_DIR = path.resolve(CONFIG_DIR, config.srcs_dir);
-
-let node_out = path.resolve(CONFIG_DIR, config.node_out);
-let web_out = path.resolve(CONFIG_DIR, config.web_out);
-let tmpDir = '';
-let tmpSrcsDir = '';
-let tmpIncludesDir = '';
-
-async function genJsIndex(dir, rootDir) {
-	rootDir = rootDir || dir;
-
-	let files = await fse.readdir(dir);
-
-	for(let index in files) {
-		let file = files[index];
-		let fullPath = path.resolve(dir, file);
-		let stat = await fse.stat(fullPath).catch(err => {
-			// Ignore non-existant files
-		});
-
-		if(stat && stat.isDirectory()) {
-			await genJsIndex(fullPath, rootDir);
-			files[index] = fullPath + "/index.js";
-		} else {
-			files[index] = fullPath;
+		for(let src of config.srcs) {
+			let srcAbs = path.resolve(configDir, config.srcs_dir, src);
+			lastWatchSrcs.push(srcAbs);
 		}
 
-		files[index] = path.relative(dir, files[index]);
+		watcher.add(lastWatchSrcs);
 	}
 
-	files = files.filter(filepath => {
-		return filepath.endsWith(".js") || filepath.endsWith("index");
-	});
-
-	await fse.writeFile(
-		path.resolve(dir, 'index.js'),
-		`module.exports = Object.assign({},` + files.map(file => {
-			let filename = path.basename(file, '.js');
-			let dirname = path.dirname(file);
-			let requirePath = `./${dirname}/${filename}`;
-
-			if(requirePath.startsWith("././")) {
-				requirePath = requirePath.substr(2);
+	let protocVersion = DEFAULT_PROTOC_VERSION;
+	if(config.protoc) {
+		
+		if(typeof config.protoc == "string") {
+			protocVersion = config.protoc;
+			logVerbose(`Found protoc version in config: ${protocVersion}`);
+		} else
+		if(typeof config.protoc == "object") {
+			if(typeof config.protoc.version == "string") {
+				protocVersion = config.protoc.version;
+				logVerbose(`Found protoc version in config: ${protocVersion}`);
+			} else {
+				logVerbose(
+					"Config property 'protoc' is an object but does not provide " +
+					`version. Using default: ${protocVersion}`
+				);
 			}
-
-			return `\n\trequire("${requirePath}")`;
-		}).join(',') +
-		`\n);\n`
-	);
-}
-
-async function genDtsIndex(dir, rootDir) {
-	rootDir = rootDir || dir;
-
-	let files = await fse.readdir(dir);
-
-	for(let index in files) {
-		let file = files[index];
-		let fullPath = path.resolve(dir, file);
-		let stat = await fse.stat(fullPath).catch(err => {
-			// Ignore non-existant files
-		});
-
-		if(stat && stat.isDirectory()) {
-			await genDtsIndex(fullPath, rootDir);
-			files[index] = fullPath + "/index";
 		} else {
-			files[index] = fullPath;
+			logVerbose(
+				"Config property 'protoc' provided, but is not an object nor a " +  
+				"string. Ignoring."
+			);
 		}
-
-		files[index] = path.relative(dir, files[index]);
 	}
 
-	files = files.filter(filepath => {
-		return filepath.endsWith(".d.ts") || filepath.endsWith("index");
-	});
-
-	await fse.writeFile(
-		path.resolve(dir, 'index.d.ts'), files.map(file => {
-			let filename = path.basename(file, '.d.ts');
-			let dirname = path.dirname(file);
-			let requirePath = `./${dirname}/${filename}`;
-
-			if(requirePath.startsWith("././")) {
-				requirePath = requirePath.substr(2);
-			}
-
-			return `export * from "${requirePath}";`;
-		}).join('\n') +
-		`\n`
+	const protoc = path.resolve(
+		BIN_DIR,
+		`protoc-${protocVersion}/bin/protoc`
+		+ (process.platform == "win32" ? '.exe' : '')
 	);
-}
 
-async function checkSyntax() {
-	const dummyExt = process.platform == 'win32' ? '.cmd' : '.sh';
-	const protoc = await which("grpc_tools_node_protoc");
-	const dummyProtocPlugin = path.resolve(__dirname, 'dummy' + dummyExt);
-	let args =  [].concat(config.srcs, [
-		'--dummy_out=./',
-		`--plugin=protoc-gen-dummy=${dummyProtocPlugin}`
-	]);
-	let options = {
-		cwd: tmpSrcsDir,
+	if(!await fs.exists(protoc)) {
+		logVerbose(
+			`Could not find protoc. Downloading protoc ${protocVersion} ...`
+		);
+		await downloadProtoc(protocVersion);
+		await fs.chmod(protoc, '755');
+	} else {
+		logVerbose(
+			`Found protoc. Using protoc ${protocVersion}`
+		);
+	}
+
+	logVerbose(`protoc binary '${protoc}'`);
+
+	let srcsDirAbs = path.resolve(configDir, config.srcs_dir);
+	let outputAdapters = [];
+	let adapterOptions = {
+		protoc: protoc,
+		protocVersion: protocVersion,
+		srcs: config.srcs,
+		srcs_dir: config.srcs_dir,
 	};
 
-	return spawnAsync(protoc, args, options).catch(err => {
-		let errLines = err.split('\n');
-		let errLineKeys = {};
+	// Run the dummy plugin just to check for syntax errors.
+	logVerbose("Running dummy plugin for syntax errors");
+	await runDummyOutput(Object.assign({}, adapterOptions));
 
-		errLines.forEach(errLine => {
-			for(let src of config.srcs) {
-				if(errLine.startsWith(src)) {
-					errLineKeys[errLine.trim()] = true;
-					return;
-				}
-			}
-		});
+	for(let outName in config.output) {
+		let outOpts = config.output[outName];
+		let outDir = "";
+		let outDirAbs = "";
+		if(typeof outOpts == "string") {
+			outDir = outOpts;
+			outOpts = {};
+		}
 
-		let msg = Object.keys(errLineKeys).map(errLine => {
-			return path.relative(CONFIG_DIR, path.resolve(SRCS_DIR, errLine));
-			// return 'example/src/' + errLine;
-		}).join('\n');
-		let syntaxError = new Error(msg);
-		syntaxError.protoSyntaxErr = true;
-		syntaxError.originalError = err;
-		return Promise.reject(syntaxError);
-	});
+		outDirAbs = outDir;
+
+		if(!path.isAbsolute(outDir)) {
+			outDirAbs = path.resolve(configDir, outDir);
+		}
+
+		outDir = path.relative(srcsDirAbs, outDirAbs);
+
+		logVerbose("Output directory:", outDirAbs);
+
+		outDir = outDir.replace(/\\/g, '/');
+
+		for(let src of config.srcs) {
+			let srcDirname = path.join(
+				path.dirname(src),
+				path.basename(src) + ".grpc.pb.js"
+			);
+
+			await fs.ensureDir(path.resolve(outDirAbs, path.dirname(srcDirname)));
+		}
+
+		let adapter = getOuputAdapter(outName, Object.assign({}, adapterOptions, {
+			outputPath: outDir,
+			options: outOpts,
+		}));
+
+		outputAdapters.push(adapter);
+	}
+
+	await Promise.all(outputAdapters.map(a => a.run()));
 }
 
-async function gen() {
-	const [
-		protoc,
-		node_protoc_plugin,
-		protoc_gen_web_ts_plugin,
-		tsc_exec,
-		protoc_gen_ngx,
-	] = await Promise.all([
-		which("grpc_tools_node_protoc"),
-		which("grpc_tools_node_protoc_plugin"),
-		which("protoc-gen-ts"),
-		which("tsc"),
-		which("protoc-gen-ngx"),
-	]);
+function parseOutputError(err = '') {
 
-	async function genNode() {
+	let errLines = err.split("\n");
+	let retErrMsg = '';
 
-		await fse.emptyDir(node_out);
-		await fse.ensureDir(node_out);
+	for(let errLine of errLines) {
+		errLine = errLine.trim();
 
-		async function genNodeJs() {
-			let args =  [].concat(
-				config.srcs,
-				[`--js_out=import_style=commonjs,binary:${node_out}`],
-				[`--grpc_out=${node_out}`],
-				[`--plugin=protoc-gen-grpc=${node_protoc_plugin}`],
-				[`--proto_path=${tmpSrcsDir}`],
-				[`--proto_path=${tmpIncludesDir}`],
-			);
-			let options = {
-				stdio: 'inherit',
-				cwd: tmpSrcsDir,
-			};
-
-			return spawnAsync(protoc, args, options);
+		let errorPattern = /(\S+):(\d+):(\d+):(.*)+$/gm;
+		let errComponents = errorPattern.exec(errLine);
+		if(!errComponents) {
+			retErrMsg += errLine + '\n';
+			continue;
 		}
-
-		async function genNodeTs() {
-			let files = await fse.readdir(node_out);
-
-			files = files.filter((file) => {
-				return file.endsWith('.js');
-			});
-
-			files.forEach(async (file) => {
-				let basename = path.basename(file, '.js');
-				let filepath = path.resolve(node_out, file);
-
-				// @TODO: Generate .d.ts files for the server side.
-			});
-		}
-
-		await genNodeJs();
-		await genNodeTs();
-		await genJsIndex(node_out);
+	
+		let [fullErr, filename, line, column, error] = errComponents;
+		
+		retErrMsg += colors.red('[ERROR] ') + fullErr + '\n';
 	}
 
-	async function genWeb() {
-		await fse.emptyDir(web_out);
-		await fse.ensureDir(web_out);
-
-		async function genWebTs() {
-			let args =  [].concat(
-				config.srcs,
-				[`--js_out=import_style=commonjs,binary:${web_out}`],
-				[`--ts_out=service=true:${web_out}`],
-				[`--plugin=protoc-gen-ts=${protoc_gen_web_ts_plugin}`],
-				[`--proto_path=${tmpSrcsDir}`],
-				[`--proto_path=${tmpIncludesDir}`],
-			);
-
-			let options = {
-				stdio: 'inherit',
-				cwd: tmpSrcsDir,
-			};
-
-			return spawnAsync(protoc, args, options);
-		}
-
-		async function genWebJs(dir = web_out) {
-			let args = [];
-
-			let files = await fse.readdir(dir);
-
-			for(let file of files) {
-				let stat = await fse.stat(file).catch(err => {
-					// Ignore non-existant files
-				});
-				if(stat && stat.isDirectory()) {
-					await genWebJs(path.resolve(dir, file));
-				}
-			}
-
-			files = files.filter((file) => {
-				return file.endsWith('.ts') && !file.endsWith('.d.ts');
-			});
-
-			args = ['-d'].concat(files);
-
-			if(files.length > 0) {
-				await spawnAsync(tsc_exec, args, {
-					stdio: 'inherit',
-					cwd: dir
-				});
-
-				Promise.all(files.map(file => {
-					return fse.remove(path.resolve(dir, file));
-				}));
-			}
-		}
-
-		async function genWebIndex(dir = web_out) {
-			let files = await fse.readdir(dir);
-			let indexPath = path.resolve(dir, 'index.ts');
-
-			for(let file of files) {
-				let stat = await fse.stat(file).catch(err => {
-					// Ignore non-existant files
-				});
-				if(stat && stat.isDirectory()) {
-					await genWebIndex(path.resolve(dir, file));
-				}
-			}
-
-			files = files.filter(file => {
-				return file.endsWith('.d.ts');
-			});
-
-			await fse.writeFile(
-				indexPath,
-				files.map(file => {
-					let filename = path.basename(file, '.d.ts');
-					let dirname = path.dirname(file);
-					if(dirname.startsWith('.')) {
-						dirname = dirname.substr(1);
-					}
-					return `export * from "./${dirname}${filename}";\n`;
-				}).join('') + `\n`
-			);
-
-			await spawnAsync(tsc_exec, ['-d', indexPath], {
-				stdio: 'inherit',
-				cwd: dir
-			});
-
-			await fse.remove(indexPath);
-		}
-
-		await genWebTs();
-		await genWebJs();
-		await genDtsIndex(web_out);
-		await genJsIndex(web_out); 
-		// await genWebIndex(web_out);
-	}
-
-	async function genNgx() {
-
-		// ngx is optional
-		if(!config.ngx_out) {
-			return;
-		}
-
-		const ngx_out = path.resolve(CONFIG_DIR, config.ngx_out);
-		const ngxWebOut = path.resolve(ngx_out, "_grpc-gen_web_out");
-
-		await fse.emptyDir(ngx_out);
-		await fse.ensureDir(ngx_out);
-		await fse.ensureDir(ngxWebOut);
-
-		async function genNgxTs() {
-			let args =  [].concat(
-				config.srcs,
-				[`--ngx_out=${ngx_out}`],
-				[`--plugin=protoc-gen-ngx=${protoc_gen_ngx}`],
-				[`--proto_path=${tmpSrcsDir}`],
-				[`--proto_path=${tmpIncludesDir}`],
-			);
-
-			let options = {
-				stdio: 'inherit',
-				cwd: tmpSrcsDir,
-			};
-
-			return spawnAsync(protoc, args, options);
-		}
-
-		async function genNgxModule() {
-
-		}
-
-		async function genNgxIndex() {
-
-		}
-
-		async function genNgxJs(dir = ngx_out) {
-			let files = await fse.readdir(dir);
-
-			for(let file of files) {
-				let stat = await fse.stat(file).catch(err => {
-					// Ignore non-existant files
-				});
-				if(stat && stat.isDirectory()) {
-					await genWebIndex(path.resolve(dir, file));
-				}
-			}
-
-			files = files.filter(file => {
-				return file.endsWith('.ts');
-			});
-
-			await spawnAsync(tsc_exec, ['-d'].concat(files), {
-				stdio: 'inherit',
-				cwd: dir
-			});
-		}
-
-		async function copyWebForNgx() {
-			await fse.copy(web_out, ngxWebOut);
-		}
-
-		await genNgxTs();
-		// await genNgxModule();
-		// await genNgxIndex();
-		// await genNgxJs();
-		await copyWebForNgx();
-	}
-
-	await Promise.all([
-		genNode(),
-		// ngx depends on web
-		genWeb().then(() => genNgx()),
-	]);
+	return retErrMsg;
 }
 
-async function startGen() {
-	let tmpDirPath = await new Promise((resolve, reject) => {
-		tmp.dir({prefix: 'grpc-gen-'}, (err, tmpDirPath) => {
-			if(err) {
-				reject(err);
+async function doMain() {
+	return main()
+		.then(() => {
+			console.log(colors.green("DONE"));
+		})
+		.catch(err => {
+
+			if(typeof err == "string") {
+				console.error(parseOutputError(err).trim());
+			} else
+			if(err instanceof GrpcGenError) {
+				console.error(colors.red("[ERROR] ") + err.message);
 			} else {
-				resolve(tmpDirPath)
+				console.error(err);
 			}
+
+			return Promise.reject(err);
 		});
-	});
+}
 
-	tmpDir = tmpDirPath;
+async function doMainWatch() {
+	let waiting = false;
+	let currentMainPromise = doMain().then(afterMain, afterMain);
 
-	tmpSrcsDir = path.resolve(tmpDirPath, "srcs");
-	tmpIncludesDir = path.resolve(tmpDirPath, "includes");
-	await Promise.all([
-		fse.ensureDir(tmpSrcsDir),
-		fse.ensureDir(tmpIncludesDir),
-	]);
+	function afterMain() {
+		currentMainPromise = null;
+		if(waiting) {
+			waiting = false;
+			currentMainPromise = doMain().then(afterMain, afterMain);
+		} else {
+			console.log("Waiting for changes ...");
+		}
+	}
+	
+	watcher = chokidar.watch();
 
-	async function copyIncludes(protosPath, name) {
-		await fse.copy(protosPath, path.resolve(tmpIncludesDir, name));
+	if(argv.config) {
+		watcher.add(argv.config);
+	} else {
+		watcher.add(defaultConfigNames);
 	}
 
-	await Promise.all([
-		fse.copy(SRCS_DIR, tmpSrcsDir),
-		copyIncludes(GOOGLE_PROTOS, "google"),
-	]);
-
-	await checkSyntax();
-	await gen();
-	await fse.remove(tmpDirPath).catch(err => {
-		// Don't fail the build just because we couldn't clean up.
+	watcher.on("change", async (e) => {
+		if(!currentMainPromise) {
+			currentMainPromise = doMain().then(afterMain, afterMain);
+		} else {
+			waiting = true;
+		}
 	});
 }
 
-startGen().catch(err => {
-	if(err.protoSyntaxErr) {
-
-		if(!err.message.trim()) {
-			console.warn("[WARN] No error message, but protoSyntaxError was set.");
-			console.warn(err.originalError);
-			process.exit(1);
-		}
-
-		let errMsg = err.message.split('\n').map(errLine => {
-			return colors.red('ERROR') + ': ' + errLine;
-		}).join('\n');
-
-		console.error(errMsg);
-	} else {
-		console.error(err);
-	}
-
-	process.exit(1);
-});
+if(argv.watch) {
+	doMainWatch();
+} else {
+	doMain().catch(() => {
+		process.exit(1);
+	});
+}

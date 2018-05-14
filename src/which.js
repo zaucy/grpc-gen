@@ -1,31 +1,35 @@
+const {GrpcGenError} = require("./error");
 const path = require("path");
-const fse = require("fs-extra");
+const fs = require("fs-extra");
+const which = require("which");
 
 const DEFAULT_DIR = path.resolve(__dirname, "..");
-const BIN_EXTS = ['.exe', '.cmd', '.sh', ''];
+const BIN_EXTS = process.platform == 'win32' ? ['.exe', '.cmd'] : ['.sh', ''];
 
-exports.which = async (command, dir = DEFAULT_DIR) => {
-	if(!await fse.exists(dir)) {
-		throw Error(
-			`Could not find '${command}'`
-		);
+const npmBinWhich = async (command, dir = DEFAULT_DIR) => {
+
+	if(!await fs.exists(dir)) {
+		return Promise.reject(new GrpcGenError(
+			`Could not find '${command}' in npm bin paths`
+		));
 	}
 
-	const goNext = () => {
+	const goNext = async () => {
 		let nextDir = path.resolve(dir, '..');
+
 		if(nextDir == dir) {
-			throw Error(
-				`Could not find '${command}'`
-			);
+			return Promise.reject(new GrpcGenError(
+				`Could not find '${command}' in npm bin paths`
+			));
 		}
 
-		return exports.which(command, nextDir);
+		return npmBinWhich(command, nextDir);
 	};
 
 	let binDir = path.resolve(dir, "node_modules/.bin");
 
-	if(await fse.exists(binDir)) {
-		let files = await fse.readdir(binDir);
+	if(await fs.exists(binDir)) {
+		let files = await fs.readdir(binDir);
 		let commandPath = files.filter(file => {
 			let fileExt = path.extname(file);
 			let fileWithoutExt = path.basename(file, fileExt);
@@ -49,3 +53,27 @@ exports.which = async (command, dir = DEFAULT_DIR) => {
 		return goNext();
 	}
 };
+
+exports.which = async (command) => {
+
+	// Check path
+	let pathWhich = await new Promise(resolve => {
+		which(command, (err, commandPath) => {
+			if(err) {
+				resolve(null);
+			} else {
+				resolve(commandPath);
+			}
+		});
+	});
+
+	if(pathWhich) {
+		return pathWhich;
+	}
+
+	return npmBinWhich(command).catch(() => {
+		return Promise.reject(new GrpcGenError(
+			`Could not find '${command}' in your PATH or npm bin paths`
+		));
+	});
+}

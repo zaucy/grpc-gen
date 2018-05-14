@@ -1,0 +1,12 @@
+include_well_known_types: false
+srcs_dir: ./src
+srcs:
+  - test.proto
+  - package.proto
+  - deep/deep.proto
+output:
+  js: dist/node
+  ts: dist/node
+  # grpc-web: dist/web
+  ngx: dist/ngx
+
