@@ -1,0 +1,7 @@
+/node_modules
+/example
+/bin
+/.vscode
+/.git
+/.gitignore
+/.travis.yml

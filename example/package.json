@@ -2,7 +2,8 @@
   "name": "grpc-gen-example",
   "scripts": {
     "build": "grpc-gen",
-    "dev": "grpc-gen --watch"
+    "dev": "grpc-gen --watch",
+    "test": "npm run build"
   },
   "dependencies": {
     "grpc-gen": "file:..",
