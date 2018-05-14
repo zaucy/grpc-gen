@@ -5,8 +5,10 @@ srcs:
   - package.proto
   - deep/deep.proto
 output:
-  js: dist/node
-  ts: dist/node
-  # grpc-web: dist/web
-  ngx: dist/ngx
-
+  - js: dist/web
+  - ts:
+      dir: dist/web
+      service: true
+  - js: dist/node
+  - ts: dist/node
+  - ngx: dist/ngx

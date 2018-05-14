@@ -205,7 +205,9 @@ async function readConfig(configPath) {
 async function main() {
 	let configPath = findConfigPath();
 	if(!configPath) {
-		throw new ConfigError(`grpc-gen config file not found`);
+		return Promise.reject(new ConfigError(
+			`grpc-gen config file not found`
+		));
 	}
 
 	configDir = path.dirname(configPath);
@@ -214,20 +216,43 @@ async function main() {
 
 	config = await readConfig(configPath);
 
-	if(typeof config.output != "object" || Object.keys(config.output).length == 0) {
-		throw new ConfigError('Config must specify at least 1 output');
+	if(typeof config.output != "object") {
+		return Promise(new ConfigError(
+			'Config must specify output as array or object'
+		));
 	}
 
-	if(!Array.isArray(config.srcs) || config.srcs.length == 0) {
-		throw new ConfigError(
+	if(Array.isArray(config.output)) {
+		if(config.output.length == 0) {
+			return Promise.reject(new ConfigError(
+				'Config must specify at least 1 output'
+			));
+		}
+	} else
+	if(Object.keys(config.output).length == 0) {
+		if(config.output.length == 0) {
+			return Promise.reject(new ConfigError(
+				'Config must specify at least 1 output'
+			));
+		}
+	}
+
+	if(!Array.isArray(config.srcs)) {
+		return Promise.reject(new ConfigError(
+			'Config must specify srcs as array'
+		));
+	}
+
+	if(config.srcs.length == 0) {
+		return Promise.reject(new ConfigError(
 			'Config must specify at least 1 source proto file in srcs'
-		);
+		));
 	}
 
-	if(config.srcs_dir) {
-
-	} else {
-		// Automatically determine srcs_dir
+	if(typeof config.srcs_dir !== "string") {
+		return Promise.reject(new ConfigError(
+			'Config must specify srcs_dir'
+		));
 	}
 
 	if(watcher) {
@@ -268,6 +293,45 @@ async function main() {
 		}
 	}
 
+	let srcsDirAbs = path.resolve(configDir, config.srcs_dir);
+	let outputs = [];
+
+	if(Array.isArray(config.output)) {
+		for(const outputItem of config.output) {
+			const outputItemType = typeof outputItem;
+			if(Array.isArray(outputItem)) {
+				return Promise.reject(new ConfigError(
+					'Output (array) item expected to be an object. Got array.'
+				));
+			} else
+			if(outputItemType!= "object") {
+				return Promise.reject(new ConfigError(
+					'Output (array) item expected to be an object. Got ' + outputItemType
+				));
+			}
+
+			const outputItemKeys = Object.keys(outputItem);
+			if(outputItemKeys.length != 1) {
+				return Promise.reject(new ConfigError(
+					'Output (array) item expected to be an object with 1 key. Got ' +
+					`${outputItemKeys.length} [${outputItemKeys.join(', ')}]`
+				));
+			}
+
+			const outName = outputItemKeys[0];
+			const outOpts = outputItem[outName];
+
+			outputs.push({outName, outOpts});
+		}
+	} else {
+		for(const outName in config.output) {
+			const outOpts = config.output[outName];
+			outputs.push({outName, outOpts});
+		}
+	}
+
+	logVerbose(`${outputs.length} outputs`);
+
 	const protoc = path.resolve(
 		BIN_DIR,
 		`protoc-${protocVersion}/bin/protoc`
@@ -286,9 +350,7 @@ async function main() {
 		);
 	}
 
-	logVerbose(`protoc binary '${protoc}'`);
-
-	let srcsDirAbs = path.resolve(configDir, config.srcs_dir);
+	
 	let outputAdapters = [];
 	let adapterOptions = {
 		protoc: protoc,
@@ -297,17 +359,27 @@ async function main() {
 		srcs_dir: config.srcs_dir,
 	};
 
+	logVerbose(`protoc binary '${protoc}'`);
+
 	// Run the dummy plugin just to check for syntax errors.
 	logVerbose("Running dummy plugin for syntax errors");
 	await runDummyOutput(Object.assign({}, adapterOptions));
 
-	for(let outName in config.output) {
-		let outOpts = config.output[outName];
+	for(let {outName, outOpts} of outputs) {
 		let outDir = "";
 		let outDirAbs = "";
 		if(typeof outOpts == "string") {
 			outDir = outOpts;
 			outOpts = {};
+		} else
+		if(Array.isArray(outOpts)) {
+			return Promise.reject(new ConfigError(
+				"Array not supported for output options"
+			));
+		} else
+		if(typeof outOpts == "object") {
+			outDir = outOpts.dir;
+			delete outOpts.dir;
 		}
 
 		outDirAbs = outDir;
