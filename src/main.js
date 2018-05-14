@@ -379,6 +379,8 @@ async function doMain() {
 			} else {
 				console.error(err);
 			}
+
+			return Promise.reject(err);
 		});
 }
 
@@ -416,5 +418,7 @@ async function doMainWatch() {
 if(argv.watch) {
 	doMainWatch();
 } else {
-	doMain();
+	doMain().catch(() => {
+		process.exit(1);
+	});
 }
