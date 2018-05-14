@@ -23,13 +23,13 @@ output:
 Install globally
 
 ```bash
-npm i -g grpc-gen
+npm i -g grpc-gen@next
 ```
 
 OR install locally in your project as a dev dependency and add a build script to your `package.json`.
 
 ```bash
-npm i -D grpc-gen
+npm i -D grpc-gen@next
 ```
 
 ```js
