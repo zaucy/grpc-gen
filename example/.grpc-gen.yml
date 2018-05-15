@@ -5,10 +5,22 @@ srcs:
   - package.proto
   - deep/deep.proto
 output:
-  - js: dist/web
+  - js:
+      dir: dist/node
+      options:
+        import_style: commonjs
+        binary: true
+  - ts: dist/node
+  - grpc-node:
+      dir: dist/node
+      custom: true
+      plugin: grpc_tools_node_protoc_plugin
+  - js:
+      dir: dist/web
+      options:
+        import_style: commonjs
+        binary: true
   - ts:
       dir: dist/web
-      service: true
-  - js: dist/node
-  - ts: dist/node
-  - ngx: dist/ngx
+      options:
+        service: true

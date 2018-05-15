@@ -366,6 +366,8 @@ async function main() {
 	await runDummyOutput(Object.assign({}, adapterOptions));
 
 	for(let {outName, outOpts} of outputs) {
+		let custom = false;
+		let pluginName = `protoc-gen-${outName}`;
 		let outDir = "";
 		let outDirAbs = "";
 		if(typeof outOpts == "string") {
@@ -379,7 +381,23 @@ async function main() {
 		} else
 		if(typeof outOpts == "object") {
 			outDir = outOpts.dir;
-			delete outOpts.dir;
+			custom = outOpts.custom || false;
+			if(outOpts.plugin) {
+				pluginName = outOpts.plugin;
+
+				if(pluginName.search(/\.|\/|\\/) > -1) {
+					return Promise.reject(new ConfigError(
+						`Invalid plugin '${pluginName}' cannot contain dots or slashes`
+					));
+				}
+			}
+			outOpts = outOpts.options || {};
+		}
+
+		if(!outDir) {
+			return Promise.reject(new ConfigError(
+				`Missing output dir for '${outName}'`
+			));
 		}
 
 		outDirAbs = outDir;
@@ -406,6 +424,8 @@ async function main() {
 		let adapter = getOuputAdapter(outName, Object.assign({}, adapterOptions, {
 			outputPath: outDir,
 			options: outOpts,
+			pluginName: pluginName,
+			custom: custom,
 		}));
 
 		outputAdapters.push(adapter);

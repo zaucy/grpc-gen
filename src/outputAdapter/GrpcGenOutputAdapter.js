@@ -69,10 +69,7 @@ class GrpcGenOutputAdapter {
 		this.pluginPath = options.pluginPath || "";
 		this.srcs = options.srcs;
 		this.srcs_dir = options.srcs_dir;
-	}
-
-	getGrpcPlugin() {
-		return null;
+		this.pluginName = options.pluginName;
 	}
 
 	parseOptions(options) {}
@@ -101,18 +98,17 @@ class GrpcGenOutputAdapter {
 			// protoc will look for the plugin with this name. We check it instead of
 			// letting protoc fail, just so we have a prettier error.
 			const pluginName = `protoc-gen-${this.outputName}`;
-			const pluginPath = await this._ensurePluginExist(pluginName);
+			const pluginExecName = this.pluginName;
+			const pluginExecPath = await this._ensurePluginExist(pluginExecName);
 
-			args.push(`--plugin=${pluginName}=${pluginPath}`)
-		}
-
-		let grpcPlugin = this.getGrpcPlugin();
-		if(grpcPlugin) {
-			let grpcPluginName = grpcPlugin.name;
-			let grpcPluginPath = await this._ensurePluginExist(grpcPluginName);
-			
-			args.push(`--grpc_out=${this.outputPath}`);
-			args.push(`--plugin=protoc-gen-grpc=${grpcPluginPath}`);
+			args.push(`--plugin=${pluginName}=${pluginExecPath}`);
+		} else
+		if(`protoc-gen-${this.outputName}` != this.pluginName) {
+			console.warn(
+				colors.yellow("[WARN]"),
+				`ignoring plugin value '${this.pluginName}' for built in output ` +
+				`'${this.outputName}'`
+			);
 		}
 
 		for(const {name, value} of this.additions) {
