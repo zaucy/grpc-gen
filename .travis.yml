@@ -1,9 +1,18 @@
-dist: xenial
 language: node_js
+
 node_js:
   - "8"
   - "10"
+
 env:
   - TEST_DIR=./
   - TEST_DIR=./example
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y curl git
+
+dist: xenial
+sudo: false
+
 script: cd $TEST_DIR && npm i && npm test
