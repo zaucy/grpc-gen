@@ -6,6 +6,7 @@
     "test": "npm run build"
   },
   "dependencies": {
+    "@grpc-gen/protoc-gen-grpc-web": "0.0.2",
     "grpc-gen": "file:..",
     "grpc-tools": "^1.6.6",
     "protoc-gen-ngx": "^0.1.1",
