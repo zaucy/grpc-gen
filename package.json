@@ -1,6 +1,6 @@
 {
   "name": "grpc-gen",
-  "version": "1.0.0-3",
+  "version": "1.0.0-4",
   "bin": "src/cli.js",
   "description": "Simple CLI for running the protoc compiler via configuration file",
   "main": "src/main",
