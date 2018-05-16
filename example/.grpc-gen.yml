@@ -5,16 +5,22 @@ srcs:
   - package.proto
   - deep/deep.proto
 output:
+
+  # Node.js with .d.ts for message typpes
   - js:
       dir: dist/node
       options:
         import_style: commonjs
         binary: true
   - ts: dist/node
+
+  # gprc service files (no service .d.ts files)
   - grpc-node:
       dir: dist/node
       custom: true
       plugin: grpc_tools_node_protoc_plugin
+  
+  # web output from https://github.com/improbable-eng/ts-protoc-gen
   - js:
       dir: dist/web
       options:
@@ -24,3 +30,12 @@ output:
       dir: dist/web
       options:
         service: true
+
+  # Built in languages with default options
+  - cpp: dist/cpp
+  - csharp: dist/csharp
+  - java: dist/java
+  - objc: dist/objc
+  - python: dist/python
+  - ruby: dist/ruby
+  - php: dist/php
