@@ -4,6 +4,8 @@
 
 Simple command line for running the protoc compiler via a configuration file
 
+## Configuration
+
 Example `.grpc-gen.yml` config file
 
 ```YAML
@@ -16,6 +18,42 @@ srcs:
 # the directory for the plugins output.
 output:
   plugin-name: output-directory
+```
+
+### Output
+
+The output configuration can either be an array or an object. Each element must be an object with exactly one key. The one key must be the plugin/language name. The value has a [long syntax](#long-syntax) and a [short syntax](#short-syntax).
+
+#### Long Syntax
+
+```YAML
+output:
+  # Name of plugin or language
+  - js:
+      # Output directory
+      dir: dist/node
+      # Options to pass to plugin
+      options:
+        import_style: commonjs
+
+  # Specify a custom plugin
+  - custom-plugin:
+      # Use to suppress the 'fallback' warning message
+      custom: true
+      # Name of plugin to look for on your PATH or npm bin directories
+      plugin: grpc_tools_node_protoc_plugin
+      # Custom plugin output directory
+      dir: dist/node
+      # Options to pass to custom plugin
+      options:
+```
+
+#### Short Syntax
+
+```YAML
+output:
+  # Name of plugin or language as key. Output direcotry as value.
+  - php: dist/php
 ```
 
 ## Install
@@ -65,4 +103,12 @@ grpc-gen --config=custom-config.yml
 
 ```
 grpc-gen --watch
+```
+
+## Troubleshooting
+
+If grpc-gen is not behaving the way you expect and want to dive into the issue you can run `grpc-gen` in **verbose mode**. Just pass `--verbose` or `-v`.
+
+```shell
+grpc-gen --verbose
 ```
