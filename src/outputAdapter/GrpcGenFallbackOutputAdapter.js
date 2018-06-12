@@ -15,7 +15,11 @@ class GrpcGenFallbackOutputAdapter extends GrpcGenOutputAdapter {
 
       for(const optionName in options) {
         const optionValue = options[optionName];
-        optionsStr = `${optionName}=${optionValue}`;
+        optionsStr += `${optionName}=${optionValue},`;
+      }
+
+      if(optionsStr[optionsStr.length-1] == ',') {
+        optionsStr = optionsStr.substr(0, optionsStr.length-1);
       }
 
       optionsStr += ':' + outputPath;
