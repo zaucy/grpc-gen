@@ -38,7 +38,6 @@ output:
 
   # Specify a custom plugin
   - custom-plugin:
-      # Use to suppress the 'fallback' warning message
       custom: true
       # Name of plugin to look for on your PATH or npm bin directories
       plugin: grpc_tools_node_protoc_plugin

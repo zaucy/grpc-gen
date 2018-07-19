@@ -18,15 +18,6 @@ function getOuputAdapter(outputName, options) {
       outputAdapterInstance = new GrpcGenFallbackOutputAdapter(
         adapterOptions
       );
-
-      // If this adapter is specified as 'custom' we don't need to warn the user
-      // that there isn't a built in adapter
-      if(!adapterOptions.custom) {
-        console.warn(
-          colors.yellow("[WARN]"),
-          `Using fallback output adapter for '${outputName}'`
-        );
-      }
     } else {
       throw err;
     }
