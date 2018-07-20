@@ -16,7 +16,7 @@ class GrpcGenGrpcWebOutputAdapter extends GrpcGenOutputAdapter {
       let options = Object.assign({}, this._options);
       let out = path.join(
         path.dirname(src),
-        path.basename(src, '.proto') + ".grpc.pb.js"
+        path.basename(src, '.proto') + "_grpc_pb.js"
       );
 
       if(options.out) {
