@@ -15,6 +15,7 @@
     "chokidar": "^2.0.3",
     "cli-progress": "^1.8.0",
     "colors": "^1.2.5",
+    "download": "^7.1.0",
     "fs-extra": "^6.0.1",
     "js-yaml": "^3.11.0",
     "tmp": "0.0.33",

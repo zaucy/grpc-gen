@@ -8,6 +8,7 @@ const yaml = require("js-yaml");
 const chokidar = require("chokidar");
 const {spawn} = require("child_process");
 const {Bar} = require("cli-progress");
+const download = require("download");
 
 const {GrpcGenError, ConfigError} = require("./error");
 const {getOuputAdapter, runDummyOutput} = require("./outputAdapter/");;
@@ -120,43 +121,22 @@ async function downloadProtoc(version) {
 	const downloadUrl = prefix + `v${version}/protoc-${version}-${platform}.zip`;
 	const extractPath = path.resolve(BIN_DIR, `protoc-${version}`)
 
-	
 	await fs.ensureDir(BIN_DIR);
 	
 	let zipPath = path.resolve(BIN_DIR, `protoc-${version}.zip`)
-	let zipWriteStream = fs.createWriteStream(zipPath);
+	await fs.remove(zipPath);
 
 	logVerbose(`Downloading '${downloadUrl}' -> '${zipPath}'`);
 
 	let bar = new Bar();
 	bar.start(100, 0);
 
-	return new Promise((resolve, reject) => {
-		https.get(downloadUrl, res => {
-			bar.update(1);
-	
-			https.get(res.headers.location, res => {
-				bar.update(5);
-				res.pipe(zipWriteStream).on('close', () => {
-					bar.update(75);
-					logVerbose(`Extracting '${zipPath}' -> '${extractPath}'`);
-					let zipReadStream = fs.createReadStream(zipPath);
-					zipReadStream.pipe(unzip.Extract({
-						path: extractPath
-					})).on("close", () => {
-						bar.update(95);
-						logVerbose(`Removing '${zipPath}'`);
-						fs.remove(zipPath).then(() => {
-							bar.update(100);
-							bar.stop();
-							resolve();
-						});
-					});
-				});
-			});
-		});
+	await download(downloadUrl, extractPath, {
+		followRedirect: true,
+		extract: true,
 	});
 
+	bar.stop();
 }
 
 function findConfigPath() {
