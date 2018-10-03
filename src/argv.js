@@ -1,4 +1,7 @@
 const argv = require("yargs")
+	.option('poll', {
+		describe: "Enable watch in poll mode"
+	})
 	.option('watch', {
 		alias: ['w'],
 		describe: "Watch for file changes"

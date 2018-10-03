@@ -490,8 +490,15 @@ async function doMainWatch() {
 			console.log("Waiting for changes ...");
 		}
 	}
+
+	let watcherOptions = {};
+
+	if(argv.poll) {
+		watch.usePolling = true;
+		watch.interval = argv.poll || 600;
+	}
 	
-	watcher = chokidar.watch();
+	watcher = chokidar.watch(watcherOptions);
 
 	if(argv.config) {
 		watcher.add(argv.config);
