@@ -4,7 +4,9 @@
   "bin": "src/cli.js",
   "description": "Simple CLI for running the protoc compiler via configuration file",
   "main": "src/main",
-  "scripts": {},
+  "scripts": {
+    "postinstall": "node postinstall.js"
+  },
   "author": "Ezekiel Warren",
   "repository": "github:zaucy/grpc-gen",
   "bugs": {
