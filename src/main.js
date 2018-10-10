@@ -473,12 +473,22 @@ async function doMainWatch() {
 
 	let watcherOptions = {};
 
-	if(argv.poll) {
-		watch.usePolling = true;
-		watch.interval = argv.poll || 600;
+	if(argv.poll && !isNaN(argv.poll)) {
+		watcherOptions.usePolling = true;
+		if(argv.poll === true) {
+			watcherOptions.interval = 600;
+		} else {
+			watcherOptions.interval = argv.poll || 600;
+		}
+
+		logVerbose(
+			'Watching using polling at',
+			watcherOptions.interval + 'ms',
+			'intervals'
+		);
 	}
-	
-	watcher = chokidar.watch(watcherOptions);
+
+	watcher = chokidar.watch([], watcherOptions);
 
 	if(argv.config) {
 		watcher.add(argv.config);
