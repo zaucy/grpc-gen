@@ -1,12 +1,12 @@
 const {ConfigError} = require("../../error");
-const {GrpcGenOutputAdapter} = require("../GrpcGenOutputAdapter");
+const {ProtocGenOutputAdapter} = require("../ProtocGenOutputAdapter");
 
 const IMPORT_STYLES = [
   "closure",
   "commonjs",
 ];
 
-class GrpcGenJsOutputAdapter extends GrpcGenOutputAdapter {
+class ProtocGenJsOutputAdapter extends ProtocGenOutputAdapter {
 
   parseOptions(options) {
     this.import_style = options.import_style || "";
@@ -53,4 +53,4 @@ class GrpcGenJsOutputAdapter extends GrpcGenOutputAdapter {
   }
 };
 
-exports.GrpcGenJsOutputAdapter = GrpcGenJsOutputAdapter;
+exports.ProtocGenJsOutputAdapter = ProtocGenJsOutputAdapter;

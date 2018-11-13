@@ -10,19 +10,19 @@ const {spawn} = require("child_process");
 const {Bar} = require("cli-progress");
 const download = require("download");
 
-const {GrpcGenError, ConfigError} = require("./error");
+const {ProtocGenError, ConfigError} = require("./error");
 const {getOuputAdapter, runDummyOutput} = require("./outputAdapter/");;
 const {logVerbose} = require("./log");
 const {argv} = require("./argv");
 
-const DEFAULT_PROTOC_VERSION = "3.5.1";
+const DEFAULT_PROTOC_VERSION = "3.6.1";
 const BIN_DIR = path.resolve(__dirname, "../bin");
 
 const defaultConfigNames = [
-	'.grpc-gen.json',
-	'.grpc-gen.yaml',
-	'.grpc-gen.yml',
-	'.grpc-gen.js',
+	'.protoc-gen.json',
+	'.protoc-gen.yaml',
+	'.protoc-gen.yml',
+	'.protoc-gen.js',
 ];
 
 let config;
@@ -83,7 +83,7 @@ async function downloadProtoc(version) {
 					platform += 'x86_32';
 					break;
 				default:
-					throw new GrpcGenError(
+					throw new ProtocGenError(
 						`Cannot download protoc for platform '${process.platform}' with ` +
 						`arch ${process.arch}`
 					);
@@ -102,7 +102,7 @@ async function downloadProtoc(version) {
 					platform += 'aarch_64';
 					break;
 				default:
-					throw new GrpcGenError(
+					throw new ProtocGenError(
 						`Cannot download protoc for platform '${process.platform}' with ` +
 						`arch ${process.arch}`
 					);
@@ -113,15 +113,16 @@ async function downloadProtoc(version) {
 			platform = 'win32';
 			break;
 		default:
-			throw new GrpcGenError(
+			throw new ProtocGenError(
 				`Cannot download protoc for platform '${process.platform}'`
 			);
 	}
 
 	const downloadUrl = prefix + `v${version}/protoc-${version}-${platform}.zip`;
-	const extractPath = path.resolve(BIN_DIR, `protoc-${version}`)
+	const extractPath = path.resolve(BIN_DIR, `protoc-${version}`);
+	const extractDir = path.dirname(extractPath);
 
-	await fs.ensureDir(BIN_DIR);
+	await fs.ensureDir(extractDir);
 	
 	let zipPath = path.resolve(BIN_DIR, `protoc-${version}.zip`)
 	await fs.remove(zipPath);
@@ -129,12 +130,24 @@ async function downloadProtoc(version) {
 	logVerbose(`Downloading '${downloadUrl}' -> '${zipPath}'`);
 
 	let bar = new Bar();
+	let chunkCount = 0;
 	bar.start(100, 0);
 
-	await download(downloadUrl, extractPath, {
+	const dlStream = download(downloadUrl, extractPath, {
 		followRedirect: true,
 		extract: true,
 	});
+
+	dlStream.on('data', () => {
+		chunkCount += 1;
+		if(chunkCount > bar.getTotal()) {
+			bar.setTotal(chunkCount);
+		}
+
+		bar.increment();
+	});
+
+	await dlStream;
 
 	bar.stop();
 }
@@ -186,7 +199,7 @@ async function main() {
 	let configPath = findConfigPath();
 	if(!configPath) {
 		return Promise.reject(new ConfigError(
-			`grpc-gen config file not found`
+			`protoc-gen config file not found`
 		));
 	}
 
@@ -447,7 +460,7 @@ async function doMain() {
 			if(typeof err == "string") {
 				console.error(parseOutputError(err).trim());
 			} else
-			if(err instanceof GrpcGenError) {
+			if(err instanceof ProtocGenError) {
 				console.error(colors.red("[ERROR] ") + err.message);
 			} else {
 				console.error(err);

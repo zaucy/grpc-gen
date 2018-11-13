@@ -21,17 +21,20 @@ output:
   
   # web output from https://github.com/improbable-eng/ts-protoc-gen
   - js:
-      dir: dist/web
+      dir: dist/improbable-eng-web
       options:
         import_style: commonjs
         binary: true
   - ts:
-      dir: dist/web
+      dir: dist/improbable-eng-web
       options:
         service: true
 
   # official grpc-web output
-  # - grpc-web: dist/grpc-web
+  - grpc-web:
+      dir: dist/grpc-web
+      options:
+        mode: base64
 
   # Built in languages with default options
   - cpp: dist/cpp

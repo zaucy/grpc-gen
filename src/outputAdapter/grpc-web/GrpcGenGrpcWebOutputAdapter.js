@@ -1,7 +1,7 @@
 const path = require("path");
-const {GrpcGenOutputAdapter} = require("../GrpcGenOutputAdapter");
+const {ProtocGenOutputAdapter} = require("../ProtocGenOutputAdapter");
 
-class GrpcGenGrpcWebOutputAdapter extends GrpcGenOutputAdapter {
+class ProtocGenGrpcWebOutputAdapter extends ProtocGenOutputAdapter {
   parseOptions(options) {
     this._options = options || {};
   }
@@ -37,4 +37,4 @@ class GrpcGenGrpcWebOutputAdapter extends GrpcGenOutputAdapter {
   }
 };
 
-exports.GrpcGenGrpcWebOutputAdapter = GrpcGenGrpcWebOutputAdapter;
+exports.ProtocGenGrpcWebOutputAdapter = ProtocGenGrpcWebOutputAdapter;

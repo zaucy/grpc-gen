@@ -1,3 +1,3 @@
-const {GrpcGenGrpcWebOutputAdapter} = require("./GrpcGenGrpcWebOutputAdapter");
+const {ProtocGenGrpcWebOutputAdapter} = require("./ProtocGenGrpcWebOutputAdapter");
 
-exports.outputAdapter = GrpcGenGrpcWebOutputAdapter;
+exports.outputAdapter = ProtocGenGrpcWebOutputAdapter;

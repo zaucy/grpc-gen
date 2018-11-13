@@ -1,6 +1,6 @@
-const {GrpcGenError, ConfigError} = require("../error");
-const {GrpcGenDummyOuputAdapter} = require("./GrpcGenDummyOuputAdapter")
-const {GrpcGenFallbackOutputAdapter} = require("./GrpcGenFallbackOutputAdapter");
+const {ProtocGenError, ConfigError} = require("../error");
+const {ProtocGenDummyOuputAdapter} = require("./ProtocGenDummyOuputAdapter")
+const {ProtocGenGenericOutputAdapter} = require("./ProtocGenGenericOutputAdapter");
 const colors = require("colors");
 
 function getOuputAdapter(outputName, options) {
@@ -15,7 +15,7 @@ function getOuputAdapter(outputName, options) {
     outputAdapterInstance = new outputAdapter(adapterOptions);
   } catch(err) {
     if(err.code == 'MODULE_NOT_FOUND') {
-      outputAdapterInstance = new GrpcGenFallbackOutputAdapter(
+      outputAdapterInstance = new ProtocGenGenericOutputAdapter(
         adapterOptions
       );
     } else {
@@ -33,7 +33,7 @@ async function runDummyOutput(options) {
     outputName: 'dummy',
     pluginName: 'protoc-gen-dummy',
   });
-  let dummyOutput = new GrpcGenDummyOuputAdapter(adapterOptions);
+  let dummyOutput = new ProtocGenDummyOuputAdapter(adapterOptions);
   dummyOutput.parseOptions(adapterOptions.options || {});
 
   await dummyOutput.run();

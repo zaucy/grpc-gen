@@ -1,6 +1,6 @@
-const {GrpcGenOutputAdapter} = require("./GrpcGenOutputAdapter");
+const {ProtocGenOutputAdapter} = require("./ProtocGenOutputAdapter");
 
-class GrpcGenFallbackOutputAdapter extends GrpcGenOutputAdapter {
+class ProtocGenGenericOutputAdapter extends ProtocGenOutputAdapter {
   parseOptions(options) {
     this.options = options;
   }
@@ -32,4 +32,4 @@ class GrpcGenFallbackOutputAdapter extends GrpcGenOutputAdapter {
 
 };
 
-exports.GrpcGenFallbackOutputAdapter = GrpcGenFallbackOutputAdapter;
+exports.ProtocGenGenericOutputAdapter = ProtocGenGenericOutputAdapter;

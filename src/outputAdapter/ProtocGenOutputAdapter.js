@@ -2,7 +2,7 @@ const {spawn} = require("child_process");
 const colors = require("colors");
 const {argv} = require("../argv");
 const {which} = require("../which");
-const {GrpcGenError} = require("../error");
+const {ProtocGenError} = require("../error");
 
 const BUILT_IN_OUTPUTS = [
 	"cpp",
@@ -15,7 +15,7 @@ const BUILT_IN_OUTPUTS = [
 	"ruby",
 	"js",
 
-	// grpc-gen related
+	// protoc-gen related
 	"dummy",
 ];
 
@@ -58,7 +58,7 @@ function spawnAsync(exec, args, options) {
 	});
 }
 
-class GrpcGenOutputAdapter {
+class ProtocGenOutputAdapter {
 
 	constructor(options) {
 		this.additions = [];
@@ -80,7 +80,7 @@ class GrpcGenOutputAdapter {
 		const foundPlugin = which(pluginName);
 
 		if(!foundPlugin) {
-			return Promise.reject(new GrpcGenError(
+			return Promise.reject(new ProtocGenError(
 				`Could not find '${pluginName}' in your PATH variable or npm bin paths`
 			));
 		}
@@ -126,4 +126,4 @@ class GrpcGenOutputAdapter {
 
 };
 
-exports.GrpcGenOutputAdapter = GrpcGenOutputAdapter;
+exports.ProtocGenOutputAdapter = ProtocGenOutputAdapter;

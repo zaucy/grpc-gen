@@ -1,3 +1,3 @@
-const {GrpcGenJsOutputAdapter} = require("./GrpcGenJsOutputAdapter");
+const {ProtocGenJsOutputAdapter} = require("./ProtocGenJsOutputAdapter");
 
-exports.outputAdapter = GrpcGenJsOutputAdapter;
+exports.outputAdapter = ProtocGenJsOutputAdapter;

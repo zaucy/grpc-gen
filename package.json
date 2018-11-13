@@ -1,16 +1,17 @@
 {
-  "name": "grpc-gen",
+  "name": "protoc-gen",
   "version": "1.2.3",
   "bin": "src/cli.js",
   "description": "Simple CLI for running the protoc compiler via configuration file",
   "main": "src/main",
   "scripts": {
-    "postinstall": "node postinstall.js"
+    "postinstall": "node postinstall.js",
+    "test": "ava"
   },
   "author": "Ezekiel Warren",
-  "repository": "github:zaucy/grpc-gen",
+  "repository": "github:zaucy/protoc-gen",
   "bugs": {
-    "url": "https://github.com/zaucy/grpc-gen/issues"
+    "url": "https://github.com/zaucy/protoc-gen/issues"
   },
   "license": "ISC",
   "dependencies": {
@@ -24,5 +25,8 @@
     "unzip": "^0.1.11",
     "which": "^1.3.0",
     "yargs": "^11.0.0"
+  },
+  "devDependencies": {
+    "ava": "1.0.0-rc.2"
   }
 }

@@ -1,10 +1,10 @@
-class GrpcGenError extends Error {};
+class ProtocGenError extends Error {};
 
-class ConfigError extends GrpcGenError {
+class ConfigError extends ProtocGenError {
 	constructor(msg) {
 		super(msg);
 	}
 };
 
-exports.GrpcGenError = GrpcGenError;
+exports.ProtocGenError = ProtocGenError;
 exports.ConfigError = ConfigError;

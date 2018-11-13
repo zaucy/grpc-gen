@@ -1,12 +1,12 @@
 const path = require("path");
-const {GrpcGenOutputAdapter} = require("./GrpcGenOutputAdapter");
+const {ProtocGenOutputAdapter} = require("./ProtocGenOutputAdapter");
 
 const DUMMY_PLUGIN_PATH = path.resolve(
   __dirname, "../bin/protoc-gen-dummy" +
   (process.platform == "win32" ? '.cmd' : '.sh')
 ).replace(/\\/g, '/');
 
-class GrpcGenDummyOuputAdapter extends GrpcGenOutputAdapter {
+class ProtocGenDummyOuputAdapter extends ProtocGenOutputAdapter {
   parseOptions(options) {
     this.options = options;
   }
@@ -20,4 +20,4 @@ class GrpcGenDummyOuputAdapter extends GrpcGenOutputAdapter {
 
 };
 
-exports.GrpcGenDummyOuputAdapter = GrpcGenDummyOuputAdapter;
+exports.ProtocGenDummyOuputAdapter = ProtocGenDummyOuputAdapter;

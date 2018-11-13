@@ -1,7 +1,8 @@
-const {GrpcGenError} = require("./error");
 const path = require("path");
 const fs = require("fs-extra");
 const which = require("which");
+
+const {ProtocGenError} = require("./error");
 const {logVerbose} = require("./log");
 
 const BIN_EXTS = process.platform == 'win32' ? ['.exe', '.cmd'] : ['.sh', ''];
@@ -13,7 +14,7 @@ const npmBinWhich = async (command, dir) => {
 	}
 
 	if(!await fs.exists(dir)) {
-		return Promise.reject(new GrpcGenError(
+		return Promise.reject(new ProtocGenError(
 			`Could not find '${command}' in npm bin paths`
 		));
 	}
@@ -22,7 +23,7 @@ const npmBinWhich = async (command, dir) => {
 		let nextDir = path.resolve(dir, '..');
 
 		if(nextDir == dir) {
-			return Promise.reject(new GrpcGenError(
+			return Promise.reject(new ProtocGenError(
 				`Could not find '${command}' in npm bin paths`
 			));
 		}
@@ -82,7 +83,7 @@ exports.which = async (command) => {
 	logVerbose(`Could not find '${command}' in PATH. Moving onto npm bin paths.`);
 
 	return npmBinWhich(command).catch(() => {
-		return Promise.reject(new GrpcGenError(
+		return Promise.reject(new ProtocGenError(
 			`Could not find '${command}' in your PATH or npm bin paths`
 		));
 	});
