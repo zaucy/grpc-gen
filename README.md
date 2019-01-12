@@ -1,7 +1,5 @@
 # gRPC gen
 
-![build-status](https://travis-ci.org/zaucy/grpc-gen.svg?branch=master)
-
 Simple command line for running the protoc compiler via a configuration file
 
 ## Configuration
