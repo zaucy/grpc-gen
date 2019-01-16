@@ -70,6 +70,7 @@ class GrpcGenOutputAdapter {
 		this.srcs = options.srcs;
 		this.srcs_dir = options.srcs_dir;
 		this.pluginName = options.pluginName;
+		this.includes = options.includes || [];
 	}
 
 	parseOptions(options) {}
@@ -109,6 +110,14 @@ class GrpcGenOutputAdapter {
 				`ignoring plugin value '${this.pluginName}' for built in output ` +
 				`'${this.outputName}'`
 			);
+		}
+
+		if(Array.isArray(this.includes) && this.includes.length > 0) {
+			const incs = [this.srcs_dir].concat(this.includes);
+
+			for(let inc of incs) {
+				args.push(`--proto_path=${inc}`);
+			}
 		}
 
 		for(const {name, value} of this.additions) {

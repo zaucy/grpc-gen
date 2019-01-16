@@ -183,6 +183,7 @@ async function readConfig(configPath) {
 }
 
 async function main() {
+	let includes = [];
 	let configPath = findConfigPath();
 	if(!configPath) {
 		return Promise.reject(new ConfigError(
@@ -233,6 +234,10 @@ async function main() {
 		return Promise.reject(new ConfigError(
 			'Config must specify srcs_dir'
 		));
+	}
+
+	if(Array.isArray(config.include)) {
+		includes = config.include.filter(inc => typeof inc === 'string');
 	}
 
 	if(watcher) {
@@ -336,7 +341,11 @@ async function main() {
 		protoc: protoc,
 		protocVersion: protocVersion,
 		srcs: config.srcs,
-		srcs_dir: config.srcs_dir,
+		srcs_dir: srcsDirAbs,
+		includes: includes.filter(inc => typeof inc === 'string').map(inc => {
+			if(path.isAbsolute(inc)) return inc;
+			else return path.resolve(configDir, inc);
+		}),
 	};
 
 	logVerbose(`protoc binary '${protoc}'`);
