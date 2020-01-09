@@ -8,7 +8,7 @@
   "dependencies": {
     "@grpc-gen/protoc-gen-grpc-web": "0.0.2",
     "grpc-gen": "file:..",
-    "grpc-tools": "^1.6.6",
+    "grpc-tools": "^1.8.1",
     "protoc-gen-ngx": "^0.1.1",
     "ts-protoc-gen": "^0.6.0"
   }
